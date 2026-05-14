@@ -23,7 +23,9 @@ pipeline {
 
   stages {
 
+    // =========================================================
     // CHECKOUT
+    // =========================================================
 
     stage('Checkout') {
 
@@ -34,7 +36,9 @@ pipeline {
       }
     }
 
+    // =========================================================
     // VALIDATE REPOSITORY
+    // =========================================================
 
     stage('Validate Repository') {
 
@@ -50,7 +54,9 @@ pipeline {
       }
     }
 
+    // =========================================================
     // DETECT YAML CHANGES
+    // =========================================================
 
     stage('Detect Infra Changes') {
 
@@ -84,7 +90,9 @@ pipeline {
       }
     }
 
+    // =========================================================
     // VALIDATE AWS ACCESS
+    // =========================================================
 
     stage('Validate AWS Access') {
 
@@ -95,14 +103,14 @@ pipeline {
       steps {
 
         sh '''
-          echo "Validating AWS access..."
-
           aws sts get-caller-identity
         '''
       }
     }
 
-    // MAKE SCRIPTS EXECUTABLE
+    // =========================================================
+    // PREPARE SCRIPTS
+    // =========================================================
 
     stage('Prepare Scripts') {
 
@@ -118,7 +126,9 @@ pipeline {
       }
     }
 
+    // =========================================================
     // TRIGGER IMAGE BUILDER
+    // =========================================================
 
     stage('Trigger Image Builder') {
 
@@ -129,14 +139,18 @@ pipeline {
       steps {
 
         sh '''
-          echo "Triggering AWS Image Builder..."
+
+          echo "Triggering Image Builder..."
 
           ./scripts/build_ami.sh
+
         '''
       }
     }
 
-    // WAIT FOR AMI CREATION
+    // =========================================================
+    // WAIT FOR AMI
+    // =========================================================
 
     stage('Wait For AMI') {
 
@@ -147,14 +161,18 @@ pipeline {
       steps {
 
         sh '''
-          echo "Waiting for AMI build..."
+
+          echo "Waiting for AMI..."
 
           ./scripts/wait_for_ami.sh
+
         '''
       }
     }
 
-    // PUBLISH AMI TO SSM
+    // =========================================================
+    // PUBLISH TO SSM
+    // =========================================================
 
     stage('Publish Latest AMI') {
 
@@ -165,14 +183,18 @@ pipeline {
       steps {
 
         sh '''
-          echo "Publishing AMI to SSM..."
+
+          echo "Publishing latest AMI..."
 
           ./scripts/publish_ami.sh
+
         '''
       }
     }
 
-    // PRINT FINAL AMI
+    // =========================================================
+    // PRINT AMI
+    // =========================================================
 
     stage('Print Latest AMI') {
 
@@ -183,15 +205,66 @@ pipeline {
       steps {
 
         sh '''
-          echo "Latest AMI:"
           cat output/ami.txt
         '''
+
+        stash(
+          name: 'ami-output',
+          includes: 'output/ami.txt'
+        )
       }
     }
 
+    // =========================================================
+    // UPDATE JENKINS CLOUD
+    // =========================================================
+
+    stage('Update Jenkins Cloud AMI') {
+
+      when {
+        expression { env.BUILD_AMI == "true" }
+      }
+
+      agent {
+        label 'built-in'
+      }
+
+      steps {
+
+        unstash 'ami-output'
+
+        script {
+
+          env.LATEST_AMI = sh(
+            script: 'cat output/ami.txt',
+            returnStdout: true
+          ).trim()
+
+          echo "Latest AMI: ${env.LATEST_AMI}"
+
+        }
+
+        writeFile(
+          file: 'latest_ami.txt',
+          text: env.LATEST_AMI
+        )
+
+        sh '''
+
+          export LATEST_AMI=$(cat latest_ami.txt)
+
+          java -jar /var/lib/jenkins/jenkins-cli.jar \
+            -s http://localhost:8080 \
+            groovy = < scripts/update_cloud.groovy
+
+        '''
+      }
+    }
   }
 
-  // POST ACTIONS
+  // =========================================================
+  // POST
+  // =========================================================
 
   post {
 
