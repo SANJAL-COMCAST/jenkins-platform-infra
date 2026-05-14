@@ -221,9 +221,9 @@ pipeline {
 
         stage('Update Jenkins Cloud AMI') {
 
-      // when {
-      //   expression { env.BUILD_AMI == "true" }
-      // }
+      when {
+        expression { env.BUILD_AMI == "true" }
+      }
 
       agent {
         label 'built-in'
