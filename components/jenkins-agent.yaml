@@ -1,5 +1,5 @@
 name: jenkins-al2023-component
-description: Golden AMI component for Amazon Linux 2023 v3
+description: Golden AMI component for Amazon Linux 2023 v4
 
 schemaVersion: 1.0
 
