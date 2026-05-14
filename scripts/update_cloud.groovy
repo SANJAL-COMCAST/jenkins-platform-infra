@@ -26,7 +26,7 @@ cloud.templates.each { template ->
     }
 }
 
-cloud.save()
+
 instance.save()
 
 println("Jenkins cloud configuration saved")
