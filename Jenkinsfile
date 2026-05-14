@@ -7,8 +7,11 @@ pipeline {
   options {
 
     buildDiscarder(logRotator(
-      numToKeepStr: '5'
+      numToKeepStr: '5',
+      artifactNumToKeepStr: '5'
     ))
+
+    timestamps()
 
   }
 
@@ -20,12 +23,34 @@ pipeline {
 
   stages {
 
+    // CHECKOUT
+
     stage('Checkout') {
 
       steps {
+
         checkout scm
+
       }
     }
+
+    // VALIDATE REPOSITORY
+
+    stage('Validate Repository') {
+
+      steps {
+
+        sh '''
+          echo "Current Workspace:"
+          pwd
+
+          echo "Repository Structure:"
+          ls -R
+        '''
+      }
+    }
+
+    // DETECT YAML CHANGES
 
     stage('Detect Infra Changes') {
 
@@ -41,16 +66,25 @@ pipeline {
             returnStdout: true
           ).trim()
 
+          echo "Changed Files:"
+          echo "${changed}"
+
           if (changed) {
+
             env.BUILD_AMI = "true"
+
           } else {
+
             env.BUILD_AMI = "false"
+
           }
 
           echo "BUILD_AMI=${env.BUILD_AMI}"
         }
       }
     }
+
+    // VALIDATE AWS ACCESS
 
     stage('Validate AWS Access') {
 
@@ -60,9 +94,31 @@ pipeline {
 
       steps {
 
-        sh 'aws sts get-caller-identity'
+        sh '''
+          echo "Validating AWS access..."
+
+          aws sts get-caller-identity
+        '''
       }
     }
+
+    // MAKE SCRIPTS EXECUTABLE
+
+    stage('Prepare Scripts') {
+
+      when {
+        expression { env.BUILD_AMI == "true" }
+      }
+
+      steps {
+
+        sh '''
+          chmod +x scripts/*.sh
+        '''
+      }
+    }
+
+    // TRIGGER IMAGE BUILDER
 
     stage('Trigger Image Builder') {
 
@@ -72,11 +128,15 @@ pipeline {
 
       steps {
 
-        sh 'chmod +x scripts/*.sh'
+        sh '''
+          echo "Triggering AWS Image Builder..."
 
-        sh './scripts/build_ami.sh'
+          ./scripts/build_ami.sh
+        '''
       }
     }
+
+    // WAIT FOR AMI CREATION
 
     stage('Wait For AMI') {
 
@@ -86,9 +146,15 @@ pipeline {
 
       steps {
 
-        sh './scripts/wait_for_ami.sh'
+        sh '''
+          echo "Waiting for AMI build..."
+
+          ./scripts/wait_for_ami.sh
+        '''
       }
     }
+
+    // PUBLISH AMI TO SSM
 
     stage('Publish Latest AMI') {
 
@@ -98,11 +164,17 @@ pipeline {
 
       steps {
 
-        sh './scripts/publish_ami.sh'
+        sh '''
+          echo "Publishing AMI to SSM..."
+
+          ./scripts/publish_ami.sh
+        '''
       }
     }
 
-    stage('Print AMI') {
+    // PRINT FINAL AMI
+
+    stage('Print Latest AMI') {
 
       when {
         expression { env.BUILD_AMI == "true" }
@@ -110,21 +182,38 @@ pipeline {
 
       steps {
 
-        sh 'cat output/ami.txt'
+        sh '''
+          echo "Latest AMI:"
+          cat output/ami.txt
+        '''
       }
     }
+
   }
+
+  // POST ACTIONS
 
   post {
 
     success {
 
       echo "Golden AMI Pipeline Success"
+
     }
 
     failure {
 
       echo "Golden AMI Pipeline Failed"
+
+    }
+
+    always {
+
+      archiveArtifacts(
+        artifacts: 'output/**/*',
+        allowEmptyArchive: true
+      )
+
     }
   }
 }
