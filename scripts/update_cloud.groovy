@@ -10,7 +10,7 @@ if (cloud == null) {
     return
 }
 
-def latestAmi = System.getenv("LATEST_AMI")
+def latestAmi = binding.variables['LATEST_AMI']
 
 println("Latest AMI: ${latestAmi}")
 
@@ -26,6 +26,7 @@ cloud.templates.each { template ->
     }
 }
 
+cloud.save()
 instance.save()
 
 println("Jenkins cloud configuration saved")

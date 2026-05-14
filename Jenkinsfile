@@ -231,14 +231,15 @@ pipeline {
 
       steps {
 
-        unstash 'ami-output'
+        // unstash 'ami-output'
 
         script {
 
-          env.LATEST_AMI = sh(
-            script: 'cat output/ami.txt',
-            returnStdout: true
-          ).trim()
+        //   env.LATEST_AMI = sh(
+        //     script: 'cat output/ami.txt',
+        //     returnStdout: true
+        //   ).trim()
+        env.LATEST_AMI = "ami-0db8a006b98252fd9"
 
           echo "Latest AMI: ${env.LATEST_AMI}"
 
@@ -259,10 +260,11 @@ pipeline {
 
             export LATEST_AMI=$(cat latest_ami.txt)
 
-            java -jar /var/lib/jenkins/jenkins-cli.jar \
-              -s http://localhost:8080 \
-              -auth $JENKINS_USER:$JENKINS_TOKEN \
-              groovy = < scripts/update_cloud.groovy
+            curl -X POST \
+  --user "$JENKINS_USER:$JENKINS_TOKEN" \
+  --data-urlencode "LATEST_AMI=$LATEST_AMI" \
+  --data-urlencode "script=$(cat scripts/update_cloud.groovy)" \
+  http://localhost:8080/scriptText
 
           '''
         }
