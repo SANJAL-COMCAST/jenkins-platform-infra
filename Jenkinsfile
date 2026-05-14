@@ -260,10 +260,13 @@ pipeline {
 
             export LATEST_AMI=$(cat latest_ami.txt)
 
-            curl -X POST \
+            SCRIPT_CONTENT=$(cat scripts/update_cloud.groovy)
+
+SCRIPT_CONTENT="def latestAmi='${LATEST_AMI}'\n${SCRIPT_CONTENT}"
+
+curl -X POST \
   --user "$JENKINS_USER:$JENKINS_TOKEN" \
-  --data-urlencode "LATEST_AMI=$LATEST_AMI" \
-  --data-urlencode "script=$(cat scripts/update_cloud.groovy)" \
+  --data-urlencode "script=${SCRIPT_CONTENT}" \
   http://localhost:8080/scriptText
 
           '''
