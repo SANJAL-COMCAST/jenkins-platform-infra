@@ -219,7 +219,7 @@ pipeline {
     // UPDATE JENKINS CLOUD
     // =========================================================
 
-    stage('Update Jenkins Cloud AMI') {
+        stage('Update Jenkins Cloud AMI') {
 
       when {
         expression { env.BUILD_AMI == "true" }
@@ -249,15 +249,23 @@ pipeline {
           text: env.LATEST_AMI
         )
 
-        sh '''
+        withCredentials([usernamePassword(
+          credentialsId: 'jenkins-api-creds',
+          usernameVariable: 'JENKINS_USER',
+          passwordVariable: 'JENKINS_TOKEN'
+        )]) {
 
-          export LATEST_AMI=$(cat latest_ami.txt)
+          sh '''
 
-          java -jar /var/lib/jenkins/jenkins-cli.jar \
-            -s http://localhost:8080 \
-            groovy = < scripts/update_cloud.groovy
+            export LATEST_AMI=$(cat latest_ami.txt)
 
-        '''
+            java -jar /var/lib/jenkins/jenkins-cli.jar \
+              -s http://localhost:8080 \
+              -auth $JENKINS_USER:$JENKINS_TOKEN \
+              groovy = < scripts/update_cloud.groovy
+
+          '''
+        }
       }
     }
   }
