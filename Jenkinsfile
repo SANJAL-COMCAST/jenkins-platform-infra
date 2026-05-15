@@ -23,9 +23,7 @@ pipeline {
 
   stages {
 
-    // =========================================================
-    // CHECKOUT
-    // =========================================================
+    // Checkout
 
     stage('Checkout') {
 
@@ -36,9 +34,7 @@ pipeline {
       }
     }
 
-    // =========================================================
-    // VALIDATE REPOSITORY
-    // =========================================================
+    // Validate Repository
 
     stage('Validate Repository') {
 
@@ -54,9 +50,7 @@ pipeline {
       }
     }
 
-    // =========================================================
-    // DETECT YAML CHANGES
-    // =========================================================
+    // Detect Infra Changes
 
     stage('Detect Infra Changes') {
 
@@ -90,9 +84,7 @@ pipeline {
       }
     }
 
-    // =========================================================
-    // VALIDATE AWS ACCESS
-    // =========================================================
+    // Validate AWS Access
 
     stage('Validate AWS Access') {
 
@@ -108,9 +100,7 @@ pipeline {
       }
     }
 
-    // =========================================================
-    // PREPARE SCRIPTS
-    // =========================================================
+    // Prepare Scripts
 
     stage('Prepare Scripts') {
 
@@ -126,9 +116,7 @@ pipeline {
       }
     }
 
-    // =========================================================
-    // TRIGGER IMAGE BUILDER
-    // =========================================================
+    // Trigger Image Builder
 
     stage('Trigger Image Builder') {
 
@@ -148,9 +136,7 @@ pipeline {
       }
     }
 
-    // =========================================================
-    // WAIT FOR AMI
-    // =========================================================
+    // Wait For AMI
 
     stage('Wait For AMI') {
 
@@ -170,9 +156,7 @@ pipeline {
       }
     }
 
-    // =========================================================
-    // PUBLISH TO SSM
-    // =========================================================
+    // Publish Latest AMI
 
     stage('Publish Latest AMI') {
 
@@ -192,9 +176,7 @@ pipeline {
       }
     }
 
-    // =========================================================
-    // PRINT AMI
-    // =========================================================
+    // Print Latest AMI
 
     stage('Print Latest AMI') {
 
@@ -215,15 +197,13 @@ pipeline {
       }
     }
 
-    // =========================================================
-    // UPDATE JENKINS CLOUD
-    // =========================================================
+    // Update Jenkins Cloud AMI
 
-        stage('Update Jenkins Cloud AMI') {
+    stage('Update Jenkins Cloud AMI') {
 
-      // when {
-      //   expression { env.BUILD_AMI == "true" }
-      // }
+      when {
+        expression { env.BUILD_AMI == "true" }
+      }
 
       agent {
         label 'built-in'
@@ -231,24 +211,17 @@ pipeline {
 
       steps {
 
-        // unstash 'ami-output'
+        unstash 'ami-output'
 
         script {
 
-        //   env.LATEST_AMI = sh(
-        //     script: 'cat output/ami.txt',
-        //     returnStdout: true
-        //   ).trim()
-        env.LATEST_AMI = "ami-0db8a006b98252fd9"
+          env.LATEST_AMI = sh(
+            script: 'cat output/ami.txt',
+            returnStdout: true
+          ).trim()
 
           echo "Latest AMI: ${env.LATEST_AMI}"
-
         }
-
-        writeFile(
-          file: 'latest_ami.txt',
-          text: env.LATEST_AMI
-        )
 
         withCredentials([usernamePassword(
           credentialsId: 'jenkins-api-creds',
@@ -258,16 +231,14 @@ pipeline {
 
           sh '''
 
-            export LATEST_AMI=$(cat latest_ami.txt)
-
             SCRIPT_CONTENT=$(cat scripts/update_cloud.groovy)
 
-SCRIPT_CONTENT="def latestAmi='${LATEST_AMI}'\n${SCRIPT_CONTENT}"
+            SCRIPT_CONTENT="def latestAmi='${LATEST_AMI}'\n${SCRIPT_CONTENT}"
 
-curl -X POST \
-  --user "$JENKINS_USER:$JENKINS_TOKEN" \
-  --data-urlencode "script=${SCRIPT_CONTENT}" \
-  http://localhost:8080/scriptText
+            curl -X POST \
+              --user "$JENKINS_USER:$JENKINS_TOKEN" \
+              --data-urlencode "script=${SCRIPT_CONTENT}" \
+              http://localhost:8080/scriptText
 
           '''
         }
@@ -275,9 +246,7 @@ curl -X POST \
     }
   }
 
-  // =========================================================
-  // POST
-  // =========================================================
+  // Post Actions
 
   post {
 
